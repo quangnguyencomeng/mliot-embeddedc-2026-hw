@@ -1,0 +1,108 @@
+============================================================
+         HW02 - CÂU TRẢ LỜI TỰ LUẬN
+============================================================
+
+----------------------------------------------------------
+TASK 4.2: Sắp xếp biến vào phân vùng bộ nhớ
+----------------------------------------------------------
+
+Sau khi biên dịch và chạy chương trình, ta quan sát được địa chỉ
+của từng biến và xác định phân vùng nhớ tương ứng:
+
+1. BIKE_MODEL (ROM / .rodata):
+   - Là mảng ký hiệu kiểu `const char[]`.
+   - Từ khóa `const` cho biết biến này chỉ đọc, nên compiler đặt
+     nó vào vùng .rodata (read-only data), khi chạy trên vi điều
+     khiển thì nó nằm trong Flash/ROM.
+
+2. total_odometer (RAM / .bss):
+   - Là biến toàn cục kiểu uint32_t, khởi tạo bằng 0.
+   - Biến toàn cục có giá trị khởi tạo bằng 0 được đưa vào vùng
+     .bss (Block Started by Symbol). Vùng này占用 RAM nhưng
+     không tốn Flash vì trình nạp tự động đặt tất cả byte thành 0.
+
+3. current_speed (RAM / Stack):
+   - Là biến cục bộ trong hàm main().
+   - Biến cục bộ (local variable) luôn được cấp phát trên Stack
+     mỗi khi hàm được gọi và tự động giải phóng khi hàm kết thúc.
+     Địa chỉ của nó nằm trong vùng Stack (một phân vùng RAM).
+
+Kết luận:
+  BIKE_MODEL   -> .rodata (Flash/ROM)
+  total_odometer -> .bss (RAM)
+  current_speed  -> Stack (RAM)
+
+
+----------------------------------------------------------
+TASK 4.3: Hiện tượng khi chạy crash_simulation()
+----------------------------------------------------------
+
+A. Khi chạy trên máy tính (PC):
+
+   Hàm crash_simulation() gọi đệ quy vô hạn. Mỗi lần gọi sẽ
+   đẩy một stack frame mới lên ngăn xếp, chứa mảng dummy[64]
+   (tức là 64 * sizeof(int) ≈ 256 byte mỗi frame).
+
+   Khi Stack đầy (trên Windows thường khoảng 1 MB, trên Linux
+   có thể từ 8 MB trở lên), chương trình tràn bộ nhớ trên stack,
+   gọi là Stack Overflow.
+
+   Trên PC, hệ điều hành sẽ phát hiện truy cập vùng nhớ bất hợp
+   pháp và gửi tín hiệu (signal) để dừng chương trình:
+     - Linux/Unix: SIGSEGV (Segmentation Fault)
+     - Windows:    EXCEPTION_STACK_OVERFLOW (code 0xC00000FD)
+
+   Chương trình bị dừng ngay lập tức và thường in ra thông báo
+  类似 "Segmentation fault" hoặc "Stack smashing detected".
+
+B. Khi chạy trên vi điều khiển ARM Cortex-M:
+
+   ARM Cortex-M có cơ chế bảo vệ stack. Khi stack tràn và vi
+   xử lý truy cập vào vùng bộ nhớ không hợp lệ, CPU sẽ phát
+   sinh ngoại lệ (exception) và nhảy vào hàm xử lý đặc biệt
+   gọi là HardFault_Handler.
+
+   Thứ tự từ ngoại lệ nhẹ đến nặng trên Cortex-M:
+     UsageFault -> BusFault -> HardFault
+
+   Hầu hết các trình khung (framework) vi điều khiển chỉ cấu hình
+   một hàm duy nhất là HardFault_Handler để xử lý tất cả các
+   lỗi nghiêm trọng, bao gồm cả Stack Overflow.
+
+
+----------------------------------------------------------
+TASK 5: Phân tích Cách 1 vs Cách 2 với Flash hạn chế
+----------------------------------------------------------
+
+Giả sử:
+  - Flash còn trống:  20 KB
+  - RAM còn trống:   128 KB
+  - uint16_t trip_history[20000] chiếm khoảng 40 KB
+
+Cách 1:  uint16_t trip_history[20000] = {0};
+Cách 2:  uint16_t trip_history[20000] = {1, 2, 3};
+
+Phân tích:
+
+  1. Cách 1 (= {0}):
+     - Khi một biến toàn cục có giá trị khởi tạo bằng 0, chuẩn C
+       quy định rằng nó được đặt vào vùng .bss.
+     - Vùng .bss CHỈ占用 RAM (128 KB còn trống là đủ), không
+       tốn dung lượng Flash.
+     - Do đó, Cách 1 sẽ biên dịch và nạp thành công.
+
+  2. Cách 2 (= {1, 2, 3}):
+     - Khi giá trị khởi tạo KHÔNG phải là 0, biến sẽ được đặt
+       vào vùng .data.
+     - Vùng .data cần lưu bản sao ban đầu trong Flash (để trình
+       nạp copy vào RAM khi khởi động) và cũng占用 RAM.
+     - Dung lượng cần lưu trong Flash cho .data = 20000 * 2 = 40 KB.
+     - Flash chỉ còn 20 KB -> KHÔNG ĐỦ -> biên dịch có thể thành
+       công nhưng nạp xuống chip sẽ lỗi vì không đủ Flash.
+
+Kết luận: Cách 1 sẽ giúp chương trình biên dịch và nạp được
+xuống chip thành công vì chỉ dùng vùng .bss (không tốn Flash),
+trong khi Cách 2 cần vùng .data (cần 40 KB Flash, vượt quá
+20 KB còn trống).
+
+============================================================
