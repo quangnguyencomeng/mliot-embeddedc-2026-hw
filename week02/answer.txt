@@ -53,7 +53,7 @@ A. Khi chạy trên máy tính (PC):
      - Windows:    EXCEPTION_STACK_OVERFLOW (code 0xC00000FD)
 
    Chương trình bị dừng ngay lập tức và thường in ra thông báo
-  类似 "Segmentation fault" hoặc "Stack smashing detected".
+   "Segmentation fault" hoặc "Stack smashing detected".
 
 B. Khi chạy trên vi điều khiển ARM Cortex-M:
 
@@ -95,7 +95,7 @@ Phân tích:
      - Khi giá trị khởi tạo KHÔNG phải là 0, biến sẽ được đặt
        vào vùng .data.
      - Vùng .data cần lưu bản sao ban đầu trong Flash (để trình
-       nạp copy vào RAM khi khởi động) và cũng占用 RAM.
+       nạp copy vào RAM khi khởi động) và cũng RAM.
      - Dung lượng cần lưu trong Flash cho .data = 20000 * 2 = 40 KB.
      - Flash chỉ còn 20 KB -> KHÔNG ĐỦ -> biên dịch có thể thành
        công nhưng nạp xuống chip sẽ lỗi vì không đủ Flash.
